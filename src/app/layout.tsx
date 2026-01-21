@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Outfit } from "next/font/google"; // Added Outfit
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" }); // Added Outfit config
 
 export const metadata: Metadata = {
   title: "Vana | AI-Powered Tech Scouting",
@@ -17,7 +18,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={cn(inter.className, "antialiased")}>{children}</body>
+      <body className={cn(inter.variable, outfit.variable, "antialiased font-sans")}>{children}</body>
     </html>
   );
 }

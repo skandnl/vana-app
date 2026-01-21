@@ -29,45 +29,83 @@
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
 
-  --radius: 0.75rem;
+  --radius: 1rem;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
   :root {
-    /* Apple-like Light/Dark compatible variable logic, but sticking to Dark Mode base as requested initially but softer */
-    --background: 240 5% 6%;
-    /* Slightly softer black */
-    --foreground: 0 0% 98%;
+    /* Vibrant Data Theme - Light Mode Default */
+    --background: 0 0% 100%;
+    /* #ffffff */
+    --foreground: 222 47% 11%;
+    /* #0f172a - Dark Navy for text */
 
-    --card: 240 5% 10%;
-    /* Lighter card background */
-    --card-foreground: 0 0% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
 
-    --popover: 240 5% 10%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 210 100% 50%;
-    /* Apple Blue */
+    /* Brand Color: Vibrant Orange from reference */
+    --primary: 14 100% 59%;
+    /* #FF5E2C - Vibrant Orange */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 4% 16%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 262 83% 58%;
+    /* #8B5CF6 - Vibrant Purple for accents */
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 100% 50%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 14 100% 95%;
+    /* Soft Orange for hovers */
+    --accent-foreground: 222 47% 11%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 240 4% 20%;
-    --input: 240 4% 20%;
-    --ring: 210 100% 50%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 14 100% 59%;
 
-    --radius: 0.75rem;
-    /* More rounded corners */
+    --radius: 1rem;
+    /* More rounded as per modern design */
+  }
+
+  .dark {
+    /* Dark Mode - Deep Navy & Neon Orange */
+    --background: 222 47% 11%;
+    /* #0f172a */
+    --foreground: 210 40% 98%;
+
+    --card: 217 33% 17%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 14 100% 59%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 262 83% 58%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 14 100% 59%;
   }
 }
 
@@ -79,5 +117,37 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+  }
+}
+
+@layer utilities {
+  .text-liquid-glass {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600;
+    background-size: 200% auto;
+    animation: shine 3s linear infinite;
+    filter: drop-shadow(0 2px 4px rgba(255, 94, 44, 0.2));
+  }
+
+  .bg-mesh-gradient {
+    background-color: #ffffff;
+    background-image:
+      radial-gradient(at 0% 0%, hsla(14, 100%, 93%, 1) 0, transparent 50%),
+      radial-gradient(at 50% 0%, hsla(260, 100%, 96%, 1) 0, transparent 50%),
+      radial-gradient(at 100% 0%, hsla(14, 100%, 93%, 1) 0, transparent 50%);
+  }
+
+  @keyframes shine {
+    to {
+      background-position: 200% center;
+    }
   }
 }
