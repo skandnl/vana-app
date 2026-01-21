@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" }); // Added Outfit config
 
 export const metadata: Metadata = {
-  title: "Vana | AI-Powered Tech Scouting",
+  title: "Comes | AI-Powered Tech Scouting",
   description: "The future of elite talent scouting.",
 };
 

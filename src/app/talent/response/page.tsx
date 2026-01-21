@@ -15,7 +15,7 @@ export default function TalentResponsePage() {
                     <CardHeader>
                         <div className="flex items-center gap-2 text-primary mb-2">
                             <span className="text-xs font-bold uppercase tracking-wider border border-primary px-2 py-0.5 rounded-full">
-                                Vana Scouting Request
+                                Comes Scouting Request
                             </span>
                         </div>
                         <CardTitle className="text-2xl">Project Alpha</CardTitle>

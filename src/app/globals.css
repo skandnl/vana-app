@@ -138,11 +138,11 @@
   }
 
   .bg-mesh-gradient {
-    background-color: #ffffff;
+    background-color: #f0fdf4; /* green-50 */
     background-image:
-      radial-gradient(at 0% 0%, hsla(14, 100%, 93%, 1) 0, transparent 50%),
-      radial-gradient(at 50% 0%, hsla(260, 100%, 96%, 1) 0, transparent 50%),
-      radial-gradient(at 100% 0%, hsla(14, 100%, 93%, 1) 0, transparent 50%);
+      radial-gradient(at 0% 0%, hsla(142, 71%, 45%, 0.15) 0, transparent 50%), /* Green */
+      radial-gradient(at 50% 0%, hsla(160, 84%, 39%, 0.1) 0, transparent 50%), /* Emerald */
+      radial-gradient(at 100% 0%, hsla(142, 71%, 45%, 0.15) 0, transparent 50%); /* Green */
   }
 
   @keyframes shine {
