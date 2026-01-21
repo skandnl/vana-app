@@ -61,22 +61,17 @@ export default function LandingPage() {
   const [hoveredStage, setHoveredStage] = useState<string | null>(null);
 
   return (
-    <div className="min-h-screen bg-mesh-gradient text-foreground flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
-
-      {/* Decorative Orbs - Green Theme */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-green-300/20 rounded-full blur-[100px] pointer-events-none mix-blend-multiply animate-blob" />
-      <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-300/20 rounded-full blur-[100px] pointer-events-none mix-blend-multiply animate-blob animation-delay-2000" />
-      <div className="absolute bottom-[-20%] left-[20%] w-[50%] h-[50%] bg-teal-300/20 rounded-full blur-[100px] pointer-events-none mix-blend-multiply animate-blob animation-delay-4000" />
+    <div className="min-h-screen bg-gradient-to-b from-white via-green-50/30 to-green-100/50 text-foreground flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
 
       {/* Header with Login */}
       <header className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-50">
         <div className="text-xl font-bold tracking-tighter flex items-center gap-2">
-          COMES
-          <Bean className="w-4 h-4 text-green-600 fill-transparent stroke-[2.5]" />
+          ORIRI
+          <img src="/comes-logo.png" alt="Oriri Logo" className="w-8 h-8 object-contain" />
         </div>
         <div className="flex items-center gap-4">
           <Link href="/services" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-            채용 프로세스
+            서비스
           </Link>
           <button className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full border border-border/50 shadow-sm hover:bg-white hover:shadow-md transition-all text-sm font-medium">
             <svg viewBox="0 0 24 24" className="w-4 h-4" xmlns="http://www.w3.org/2000/svg">
@@ -95,8 +90,17 @@ export default function LandingPage() {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
-        className="max-w-2xl text-center space-y-8 z-10"
+        className="max-w-2xl text-center space-y-8 z-10 mt-24"
       >
+
+
+        <div className="relative">
+          <h1 className="text-8xl md:text-9xl font-black tracking-tighter text-foreground pb-4 flex items-center justify-center gap-4">
+            ORIRI
+            <img src="/comes-logo.png" alt="Oriri Logo" className="w-24 h-24 md:w-32 md:h-32 object-contain -ml-2" />
+          </h1>
+        </div>
+
         <motion.div
           className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/50 backdrop-blur-md border border-white/60 shadow-sm text-green-700 text-sm font-semibold mb-2"
           initial={{ opacity: 0, scale: 0.9 }}
@@ -106,21 +110,6 @@ export default function LandingPage() {
           <Bean className="w-4 h-4 fill-transparent stroke-[2.5]" />
           <span className="tracking-wide text-foreground/80">Seed부터 Unicorn까지, 팀 성장의 모든 것</span>
         </motion.div>
-
-        <div className="relative">
-          <h1 className="text-8xl md:text-9xl font-black tracking-tighter text-foreground pb-4 flex items-center justify-center gap-4">
-            COMES
-            <div className="bg-green-100 rounded-full p-2">
-              <Bean className="w-16 h-16 md:w-24 md:h-24 text-green-600 fill-transparent stroke-[3]" />
-            </div>
-          </h1>
-        </div>
-
-        <div className="bg-white/30 backdrop-blur-sm p-6 rounded-2xl border border-white/20 shadow-sm mx-4">
-          <p className="text-xl md:text-2xl text-foreground/80 max-w-lg mx-auto leading-relaxed font-light">
-            세상을 바꿀 <span className="text-green-700 font-bold">빌더(Builder)</span>들을 위한<br />AI 인재 매칭 엔진.
-          </p>
-        </div>
 
         <div className="pt-8 pb-4">
           <span className="text-lg text-muted-foreground font-medium bg-white/50 px-4 py-2 rounded-full backdrop-blur-sm">
@@ -253,14 +242,14 @@ export default function LandingPage() {
 
                     <div className="bg-green-50/50 p-6 rounded-2xl border border-green-100/50 flex flex-col justify-between">
                       <div>
-                        <h4 className="text-lg font-bold text-green-800 mb-4 font-jamsil">Comes Solution</h4>
+                        <h4 className="text-lg font-bold text-green-800 mb-4 font-jamsil">Oriri Solution</h4>
                         <p className="text-sm text-green-900/80 leading-7">
                           {guide.solution}
                         </p>
                       </div>
                       <div className="mt-8">
                         <Link href={`/talent/request?stage=${stage.id}`}>
-                          <Button className="w-full h-12 text-lg font-bold bg-green-600 hover:bg-green-700 shadow-lg shadow-green-200 font-jamsil">
+                          <Button className="w-full h-12 text-lg font-bold bg-green-600 hover:bg-green-700 shadow-lg shadow-green-200 font-jamsil focus-visible:ring-green-600 focus-visible:ring-offset-green-100">
                             인재찾기 <ChevronRight className="w-5 h-5 ml-1" />
                           </Button>
                         </Link>
