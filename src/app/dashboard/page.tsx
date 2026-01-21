@@ -241,7 +241,7 @@ export default function DashboardPage() {
                             <div>
                                 <h3 className="text-sm font-bold text-purple-900">Invenire AI Sourcing Complete</h3>
                                 <p className="text-xs text-purple-700/80 mt-1 leading-relaxed">
-                                    <span className="font-bold">Invenire AI</span>가 설정하신 핵심 역량을 기반으로 {outerCandidates.length}명의 후보자를 찾았습니다.
+                                    Invenire가 설정하신 핵심 역량을 기반으로 {outerCandidates.length}명의 후보자를 찾았습니다.
                                     AI 이메일 인터뷰를 통해 팀 핏(Team Fit)을 검증해보세요.
                                 </p>
                             </div>

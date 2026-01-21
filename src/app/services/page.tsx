@@ -16,14 +16,14 @@ export default function ServicesPage() {
         },
         {
             title: "AI Mail Interview",
-            description: "Comes의 **AI Mail 응답 모델**이 후보자와 심층적인 이메일 대화를 나눕니다. 단순 문답이 아닌, 후보자의 생각과 경험을 깊이 있게 파악합니다.",
+            description: "Invenire가 후보자와 심층적인 이메일 대화를 나눕니다. 단순 문답이 아닌, 후보자의 생각과 경험을 깊이 있게 파악합니다.",
             icon: Users,
             color: "text-blue-500",
             bg: "bg-blue-500/10"
         },
         {
             title: "Smart Coffee Chat Matching",
-            description: "AI 분석 결과를 바탕으로, 대표님이 가장 만나보고 싶은 인재를 골라 **커피챗**을 제안하세요. 불필요한 서류 검토 시간을 0으로 줄여드립니다.",
+            description: "AI 분석 결과를 바탕으로, 대표님이 가장 만나보고 싶은 인재를 골라 커피챗을 제안하세요. 불필요한 서류 검토 시간을 0으로 줄여드립니다.",
             icon: LineChart, // Keeping LineChart or could swap for another generic icon
             color: "text-purple-500",
             bg: "bg-purple-500/10"
@@ -46,7 +46,7 @@ export default function ServicesPage() {
                             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Home
                         </Button>
                     </Link>
-                    <h1 className="text-2xl font-bold tracking-tight">VANA Services</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">Oriri Services</h1>
                 </header>
 
                 <motion.div
@@ -59,7 +59,7 @@ export default function ServicesPage() {
                             채용의 미래를 경험하세요
                         </h2>
                         <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                            Comes는 단순한 매칭 플랫폼이 아닙니다.<br />
+                            Oriri는 단순한 매칭 플랫폼이 아닙니다.<br />
                             스타트업의 성장을 가속화하는 올인원 채용 OS입니다.
                         </p>
                     </div>
@@ -99,7 +99,7 @@ export default function ServicesPage() {
                     <div className="relative z-10 space-y-6">
                         <h2 className="text-3xl font-bold">지금 바로 시작해보세요</h2>
                         <p className="text-white/80 max-w-lg mx-auto">
-                            초기 스타트업에게는 속도가 생명입니다. Comes와 함께 3개월 걸릴 채용을 3일로 단축하세요.
+                            초기 스타트업에게는 속도가 생명입니다. Oriri와 함께 3개월 걸릴 채용을 3일로 단축하세요.
                         </p>
                         <div className="pt-4">
                             <Link href="/">
