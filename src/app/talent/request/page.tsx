@@ -1,19 +1,24 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sprout, Loader2, Search, Database, Globe, ListChecks, Lightbulb, Users, ArrowRight, BrainCircuit, CheckCircle2, X, Crown, AlertTriangle, ShieldCheck, Zap } from "lucide-react";
+import { Sprout, Loader2, Search, Database, Globe, ListChecks, Lightbulb, Users, ArrowRight, BrainCircuit, CheckCircle2, X, Crown, AlertTriangle, ShieldCheck, Zap, ChevronDown, ChevronUp, Map as MapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { HIRING_GUIDES } from "@/lib/data/hiring-guides";
 import { TALENT_REQUEST_SCHEMA } from "@/lib/schemas";
 import { z } from "zod";
+
+import { ASSESSMENT_QUESTIONS, getQuestionsByCategory, AssessmentQuestion } from "@/lib/data/assessment-questions";
+import { generateMemberAnalysis } from "@/lib/analysis-utils";
 
 // --- Types ---
 
@@ -24,7 +29,23 @@ interface TeamMember {
     name: string;
     role: string;
     mbti: MBTI | "";
+    workStyle: "flexible" | "structured" | "fast" | "deep" | ""; // New Facet
     isLeader: boolean;
+    showEvaluation?: boolean;
+    // New Enhanced Profile Fields
+    commStyle?: "Direct" | "Indirect" | "Data" | "Relation" | "";
+    collabStyle?: "Leader" | "Supporter" | "Mediator" | "Solo" | "";
+    strengths?: string[];
+    // Assessment Data
+    assessmentAnswers?: Record<string, number>; // questionId -> score (1-5)
+    evaluation?: {
+        safety: number;
+        execution: number;
+        impact: number;
+        openness: number;
+        communication: number;
+        grit: number;
+    };
 }
 
 interface RequestState {
@@ -46,6 +67,14 @@ interface RequestState {
     customQuestions: string[];
 }
 
+import { RadarChart } from "@/components/radar-chart";
+import { GrowthScoreGauge } from "@/components/growth-gauge";
+import { RoleBalanceHeatmap } from "@/components/role-heatmap";
+import { AssessmentModal } from "./assessment-modal";
+
+
+// ... existing interfaces ...
+
 interface TeamAnalysisResult {
     dominantTraits: string[];
     deficiencies: string[];
@@ -56,6 +85,16 @@ interface TeamAnalysisResult {
         score: number;
         scenario: string;
     };
+    radarData: { label: string; value: number }[];
+    // Enhanced Report Fields
+    commStyle?: string;
+    collabStyle?: string;
+    topStrengths?: string[];
+    // Premium Report Fields
+    growthScore: number;
+    readinessMetrics: { stability: number; velocity: number; innovation: number };
+    roleBalance: { hacker: number; hustler: number; hipster: number };
+    roadmap: string[];
 }
 
 const MBTI_OPTIONS: MBTI[] = [
@@ -65,10 +104,36 @@ const MBTI_OPTIONS: MBTI[] = [
     "ESTJ", "ESFJ", "ENFJ", "ENTJ"
 ];
 
+const EVALUATION_METRICS = [
+    { key: 'safety', label: '심리적 안정감', desc: '이견 제시의 자유' },
+    { key: 'execution', label: '실행력', desc: '납기 준수/완결성' },
+    { key: 'impact', label: '영향력', desc: '업무 의미 인식' },
+    { key: 'openness', label: '개방성', desc: '새로운 시도' },
+    { key: 'communication', label: '소통 능력', desc: '협업/경청' },
+    { key: 'grit', label: '끈기', desc: '어려움 극복' }
+] as const;
+
+const COMM_STYLES = [
+    { value: "Direct", label: "직설적 (Direct)" },
+    { value: "Indirect", label: "우회적 (Indirect)" },
+    { value: "Data", label: "데이터 중심 (Data)" },
+    { value: "Relation", label: "관계 중심 (Relation)" }
+];
+
+const COLLAB_STYLES = [
+    { value: "Leader", label: "주도적 (Leader)" },
+    { value: "Supporter", label: "조력자 (Supporter)" },
+    { value: "Mediator", label: "중재자 (Mediator)" },
+    { value: "Solo", label: "독립적 (Solo)" }
+];
+
+const STRENGTH_OPTIONS = ["Vision", "Execution", "Domain Expert", "Networker", "Strategist", "Mood Maker"];
+
 // --- Advanced Analysis Logic ---
 
 function calculateTeamDNA(members: TeamMember[]): { scores: Record<string, number>, analysis: TeamAnalysisResult, recommendedMBTI: string } {
     let scores = { EI: 0, SN: 0, TF: 0, JP: 0 };
+    // ... (keep existing score calculation logic) ...
     let leaderFound = false;
 
     const leader = members.find(m => m.isLeader);
@@ -90,7 +155,7 @@ function calculateTeamDNA(members: TeamMember[]): { scores: Record<string, numbe
         leaderFound = true;
     }
 
-    let othersVec = { EI: 0, SN: 0, TF: 0, JP: 0 };
+    const othersVec = { EI: 0, SN: 0, TF: 0, JP: 0 };
     let validOthers = 0;
     others.forEach(m => {
         if (m.mbti) {
@@ -121,9 +186,11 @@ function calculateTeamDNA(members: TeamMember[]): { scores: Record<string, numbe
         scores = othersVec;
     }
 
+
     const dominantTraits: string[] = [];
     const deficiencies: string[] = [];
 
+    // ... (Keep existing trait logic) ...
     if (scores.EI > 0.3) dominantTraits.push("E (외향)"); else if (scores.EI < -0.3) dominantTraits.push("I (내향)");
     if (scores.SN > 0.3) dominantTraits.push("S (감각)"); else if (scores.SN < -0.3) dominantTraits.push("N (직관)");
     if (scores.TF > 0.3) dominantTraits.push("T (사고)"); else if (scores.TF < -0.3) dominantTraits.push("F (감정)");
@@ -135,16 +202,48 @@ function calculateTeamDNA(members: TeamMember[]): { scores: Record<string, numbe
     if (scores.JP > 0.5) deficiencies.push("P (유연성)"); else if (scores.JP < -0.5) deficiencies.push("J (체계)");
 
     let dnaDesc = "균형 잡힌 팀입니다.";
+    // ... (Keep existing desc logic) ...
     if (scores.SN < -0.3 && scores.TF > 0.3) dnaDesc = "전형적인 '혁신가' 조직 (NT): 논리적이고 비전 중심적입니다.";
     else if (scores.SN > 0.3 && scores.JP > 0.3) dnaDesc = "전형적인 '관리자' 조직 (SJ): 체계적이고 안정적입니다.";
     else if (scores.SN < -0.3 && scores.TF < -0.3) dnaDesc = "이상적인 '열정가' 조직 (NF): 의미와 관계를 중시합니다.";
     else if (scores.SN > 0.3 && scores.JP < -0.3) dnaDesc = "자유로운 '활동가' 조직 (SP): 임기응변에 강합니다.";
 
     let defDesc = "특별한 결핍이 발견되지 않았습니다.";
+    // ... (Keep existing def logic) ...
     if (deficiencies.includes("S (실행력)")) defDesc = "아이디어는 넘치지만, 구체적인 실행과 디테일(S)이 부족할 수 있습니다.";
     else if (deficiencies.includes("F (공감)")) defDesc = "업무 효율은 높지만, 팀 케어와 심리적 유대감(F)이 부족한 건조한 조직일 수 있습니다.";
     else if (deficiencies.includes("J (체계)")) defDesc = "유연하지만, 마감 준수나 체계적인 프로세스(J)가 약할 수 있습니다.";
     else if (deficiencies.includes("N (상상력)")) defDesc = "현실적이지만, 장기적인 비전이나 새로운 시도(N)가 부족할 수 있습니다.";
+
+
+    // --- ENHANCED PROFILE ANALYSIS ---
+    const commCounts: Record<string, number> = {};
+    const collabCounts: Record<string, number> = {};
+    const strengthCounts: Record<string, number> = {};
+
+    members.forEach(m => {
+        if (m.commStyle) commCounts[m.commStyle] = (commCounts[m.commStyle] || 0) + 1;
+        if (m.collabStyle) collabCounts[m.collabStyle] = (collabCounts[m.collabStyle] || 0) + 1;
+        m.strengths?.forEach(s => strengthCounts[s] = (strengthCounts[s] || 0) + 1);
+    });
+
+    const getDominant = (counts: Record<string, number>) => Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+    const topComm = getDominant(commCounts);
+    const topCollab = getDominant(collabCounts);
+
+    const commTraits: Record<string, string> = {
+        "Direct": "직설적이고 빠른", "Indirect": "신중하고 우회적인",
+        "Data": "데이터와 사실 기반의", "Relation": "관계와 감성을 중시하는"
+    };
+    const collabTraits: Record<string, string> = {
+        "Leader": "주도적 리더십", "Supporter": "상호 조력",
+        "Mediator": "조율과 중재", "Solo": "개별 독립 결과물"
+    };
+
+    if (topComm && topCollab) {
+        dnaDesc += ` 또한, ${commTraits[topComm] || topComm} 소통 방식을 선호하며, ${collabTraits[topCollab] || topCollab} 중심의 협업 문화가 특징입니다.`;
+    }
 
     const recStr = [
         scores.EI > 0 ? "E" : "I",
@@ -152,6 +251,77 @@ function calculateTeamDNA(members: TeamMember[]): { scores: Record<string, numbe
         scores.TF > 0 ? "T" : "F",
         scores.JP > 0 ? "J" : "P"
     ].join("");
+
+
+    // --- RADAR CHART CALCULATION (Startup Hexagon) ---
+    // Mapping MBTI proxies to Hexagon dimensions for "Simulation" feel
+    // Real app would ask more specific questions.
+
+    let safetySum = 0;
+    let dependabilitySum = 0;
+    let impactSum = 0;
+    let opennessSum = 0;
+    let communicationSum = 0;
+    let gritSum = 0;
+    let memberCount = 0;
+
+    members.forEach(m => {
+        memberCount++;
+        // Mandatory Evaluation Logic (scale 1-5 -> 20-100)
+        // Default to middle (3) if somehow missing to prevent crash, though validation ensures it.
+        const ev = m.evaluation || { safety: 3, execution: 3, impact: 3, openness: 3, communication: 3, grit: 3 };
+
+        safetySum += ev.safety * 20;
+        dependabilitySum += ev.execution * 20;
+        impactSum += ev.impact * 20;
+        opennessSum += ev.openness * 20;
+        communicationSum += ev.communication * 20;
+        gritSum += ev.grit * 20;
+    });
+
+    // Clamp values 30-100
+    const clamp = (n: number) => Math.min(100, Math.max(30, Math.round(n)));
+
+    const radarData = memberCount === 0 ? [] : [
+        { label: "Psych. Safety", value: clamp(safetySum / memberCount) },
+        { label: "Execution", value: clamp(dependabilitySum / memberCount) },
+        { label: "Impact", value: clamp(impactSum / memberCount) },
+        { label: "Openness", value: clamp(opennessSum / memberCount) },
+        { label: "Communication", value: clamp(communicationSum / memberCount) },
+        { label: "Grit", value: clamp(gritSum / memberCount) },
+    ];
+
+
+    // --- PREMIUM: Vana Growth Readiness Model ---
+
+    // 1. Role Balance (Hacker, Hustler, Hipster)
+    let hacker = 0, hustler = 0, hipster = 0;
+    members.forEach(m => {
+        const r = m.role.toLowerCase();
+        if (r.includes('dev') || r.includes('engineer') || r.includes('cto') || r.includes('tech') || r.includes('architect')) hacker++;
+        else if (r.includes('biz') || r.includes('sale') || r.includes('marketer') || r.includes('ceo') || r.includes('op') || r.includes('growth')) hustler++;
+        else if (r.includes('design') || r.includes('product') || r.includes('art') || r.includes('cx') || r.includes('ux')) hipster++;
+        else {
+            const v = getVec(m.mbti || "");
+            if (v.TF > 0) hacker += 0.5;
+            else if (v.EI > 0) hustler += 0.5;
+            else hipster += 0.5;
+        }
+    });
+
+    // 2. Growth Readiness Metrics
+    const stabilityScore = clamp(safetySum / memberCount);
+    const velocityScore = clamp(((dependabilitySum + gritSum) / 2) / memberCount);
+    const innovationScore = clamp(((opennessSum + impactSum) / 2) / memberCount);
+    const growthScore = clamp((stabilityScore * 0.4) + (velocityScore * 0.3) + (innovationScore * 0.3));
+
+    // 3. Actionable Roadmap
+    const roadmap: string[] = [];
+    if (memberCount < 3) roadmap.push("초기 창업 팀 구성 (Hacker, Hustler, Hipster)의 핵심 3요소를 갖추기 위해 부족한 역할을 최우선 채용하세요.");
+    if (stabilityScore < 60) roadmap.push("팀의 심리적 안정감이 낮습니다. 실패를 용인하는 문화를 명시하고 정기적인 1:1 면담 프로세스를 구축하세요.");
+    if (velocityScore < 60) roadmap.push("실행 속도가 저하될 우려가 있습니다. 의사결정 권한을 위임하고 단기 스프린트 목표를 명확히 하세요.");
+    if (innovationScore < 60) roadmap.push("새로운 아이디어 제안이 부족할 수 있습니다. '브레인스토밍 데이'를 도입하거나 외부 전문가의 자문을 구하세요.");
+    if (deficiencies.length > 0) roadmap.push(`현재 부족한 '${deficiencies[0]}' 역량을 보완할 수 있는 인재(${recStr} 유형)를 다음 채용 시 우대하세요.`);
 
     return {
         scores,
@@ -162,7 +332,20 @@ function calculateTeamDNA(members: TeamMember[]): { scores: Record<string, numbe
             dnaDescription: dnaDesc,
             deficiencyDescription: defDesc,
             recommendedPersona: "",
-            simulation: { score: 0, scenario: "" }
+            simulation: { score: 0, scenario: "" },
+            radarData,
+            // New Fields
+            commStyle: topComm ? (commTraits[topComm] || topComm) : undefined,
+            collabStyle: topCollab ? (collabTraits[topCollab] || topCollab) : undefined,
+            topStrengths: Object.entries(strengthCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .map(([k]) => k),
+            // Premium Fields
+            growthScore,
+            readinessMetrics: { stability: stabilityScore, velocity: velocityScore, innovation: innovationScore },
+            roleBalance: { hacker, hustler, hipster },
+            roadmap
         }
     };
 }
@@ -215,6 +398,43 @@ function generateMockQuestions(role: string, goal: string, strategy: string): st
     return coreQuestions;
 }
 
+const Stepper = ({ step }: { step: number }) => (
+    <div className="w-full max-w-3xl mx-auto mb-10">
+        <div className="relative flex justify-between items-center">
+            <div className="absolute top-1/2 left-0 w-full h-1 bg-secondary -z-10 rounded-full">
+                <motion.div
+                    className="h-full bg-primary rounded-full"
+                    initial={{ width: "0%" }}
+                    animate={{ width: `${(step - 1) * 50}%` }}
+                    transition={{ duration: 0.5, ease: "easeInOut" }}
+                />
+            </div>
+
+            {[1, 2, 3].map((s) => (
+                <div key={s} className="flex flex-col items-center gap-2 bg-background px-2">
+                    <motion.div
+                        className={cn(
+                            "w-10 h-10 rounded-full flex items-center justify-center border-2 text-sm font-bold transition-colors",
+                            s <= step ? "bg-primary border-primary text-primary-foreground" : "bg-background border-muted-foreground/30 text-muted-foreground"
+                        )}
+                        animate={{ scale: s === step ? 1.1 : 1 }}
+                    >
+                        {s < step ? <CheckCircle2 className="w-6 h-6" /> : s}
+                    </motion.div>
+                    <span className={cn(
+                        "text-xs font-jamsil whitespace-nowrap transition-colors",
+                        s <= step ? "text-primary" : "text-muted-foreground"
+                    )}>
+                        {s === 1 && "Start Analysis"}
+                        {s === 2 && "Setup Strategy"}
+                        {s === 3 && "Start Matching"}
+                    </span>
+                </div>
+            ))}
+        </div>
+    </div>
+);
+
 // --- Component ---
 
 function TalentRequestWizard() {
@@ -229,7 +449,7 @@ function TalentRequestWizard() {
     const [loadingStep, setLoadingStep] = useState(0);
 
     const [formData, setFormData] = useState<RequestState>({
-        teamMembers: [{ id: "1", name: "", role: "Founder", mbti: "", isLeader: true }],
+        teamMembers: [{ id: "1", name: "", role: "Founder", mbti: "", workStyle: "", isLeader: true }],
         teamGoal: "",
         strategy: "complement",
         role: "",
@@ -242,17 +462,26 @@ function TalentRequestWizard() {
         customQuestions: []
     });
 
-    const [analysis, setAnalysis] = useState<ReturnType<typeof getRecommendation> & { deficiencyDesc: string, dnaDesc: string } | null>(null);
+    const [activeAssessmentMemberId, setActiveAssessmentMemberId] = useState<string | null>(null);
+
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    useEffect(() => {
+    const analysis = useMemo(() => {
         const { recommendedMBTI, analysis: rawAnalysis } = calculateTeamDNA(formData.teamMembers);
         const rec = getRecommendation(recommendedMBTI, formData.strategy);
-        setAnalysis({
+        return {
             ...rec,
             deficiencyDesc: rawAnalysis.deficiencyDescription,
-            dnaDesc: rawAnalysis.dnaDescription
-        });
+            dnaDesc: rawAnalysis.dnaDescription,
+            radarData: rawAnalysis.radarData,
+            commStyle: rawAnalysis.commStyle,
+            collabStyle: rawAnalysis.collabStyle,
+            topStrengths: rawAnalysis.topStrengths,
+            growthScore: rawAnalysis.growthScore,
+            readinessMetrics: rawAnalysis.readinessMetrics,
+            roleBalance: rawAnalysis.roleBalance,
+            roadmap: rawAnalysis.roadmap
+        };
     }, [formData.teamMembers, formData.strategy]);
 
 
@@ -284,7 +513,19 @@ function TalentRequestWizard() {
     const handleAddMember = () => {
         setFormData(prev => ({
             ...prev,
-            teamMembers: [...prev.teamMembers, { id: Math.random().toString(), name: "", role: "", mbti: "", isLeader: false }]
+            teamMembers: [...prev.teamMembers, {
+                id: Math.random().toString(),
+                name: "",
+                role: "",
+                mbti: "",
+                workStyle: "",
+                isLeader: false,
+                showEvaluation: true,
+                commStyle: "",
+                collabStyle: "",
+                strengths: [],
+                evaluation: { safety: 3, execution: 3, impact: 3, openness: 3, communication: 3, grit: 3 }
+            }]
         }));
     };
 
@@ -296,7 +537,7 @@ function TalentRequestWizard() {
         }));
     };
 
-    const updateMember = (id: string, field: keyof TeamMember, value: any) => {
+    const updateMember = (id: string, field: keyof TeamMember, value: TeamMember[keyof TeamMember]) => {
         setFormData(prev => ({
             ...prev,
             teamMembers: prev.teamMembers.map(m => {
@@ -314,6 +555,70 @@ function TalentRequestWizard() {
         }));
     };
 
+    const toggleEvaluation = (id: string) => {
+        setFormData(prev => ({
+            ...prev,
+            teamMembers: prev.teamMembers.map(m => {
+                if (m.id === id) return { ...m, showEvaluation: !m.showEvaluation };
+                return m;
+            })
+        }));
+    };
+
+    const updateEvaluation = (id: string, metric: keyof NonNullable<TeamMember['evaluation']>, value: number) => {
+        setFormData(prev => ({
+            ...prev,
+            teamMembers: prev.teamMembers.map(m => {
+                if (m.id === id) {
+                    const currentEval = m.evaluation || { safety: 5, execution: 5, impact: 5, openness: 5, communication: 5, grit: 5 };
+                    return { ...m, evaluation: { ...currentEval, [metric]: value } };
+                }
+                return m;
+            })
+        }));
+    };
+
+    const handleAssessmentComplete = (answers: Record<string, number>, memberId: string) => {
+        // Use the explicit memberId passed from the modal for reliability
+        const targetId = memberId || activeAssessmentMemberId;
+
+        if (!targetId) return;
+
+        // Calculate averages by category
+        const scores: any = { safety: 0, execution: 0, impact: 0, openness: 0, communication: 0, grit: 0 };
+        const counts: any = { safety: 0, execution: 0, impact: 0, openness: 0, communication: 0, grit: 0 };
+
+        Object.entries(answers).forEach(([qId, score]) => {
+            const question = ASSESSMENT_QUESTIONS.find(q => q.id === qId);
+            if (question) {
+                scores[question.category] += score;
+                counts[question.category] += 1;
+            }
+        });
+
+        // Compute averages (default to 3 if no questions for category)
+        const finalEval: any = {};
+        const categories = ['safety', 'execution', 'impact', 'openness', 'communication', 'grit'];
+        categories.forEach(cat => {
+            finalEval[cat] = counts[cat] > 0 ? parseFloat((scores[cat] / counts[cat]).toFixed(1)) : 3;
+        });
+
+        setFormData(prev => ({
+            ...prev,
+            teamMembers: prev.teamMembers.map(m => {
+                if (m.id === targetId) {
+                    return {
+                        ...m,
+                        assessmentAnswers: answers,
+                        evaluation: finalEval
+                    };
+                }
+                return m;
+            })
+        }));
+        setActiveAssessmentMemberId(null);
+    };
+
     const validateStep = (currentStep: number) => {
         try {
             if (currentStep === 1) {
@@ -329,15 +634,10 @@ function TalentRequestWizard() {
             console.error("Validation Error:", error);
             if (error instanceof z.ZodError) {
                 const newErrors: Record<string, string> = {};
-                // ZodError has .issues typically, checking both for safety
-                const issues = error.issues || (error as any).errors;
-
-                if (Array.isArray(issues)) {
-                    issues.forEach((err: any) => {
-                        const path = err.path.join(".");
-                        newErrors[path] = err.message;
-                    });
-                }
+                error.issues.forEach((err) => {
+                    const path = err.path.join(".");
+                    newErrors[path] = err.message;
+                });
                 setErrors(newErrors);
             }
             return false;
@@ -363,42 +663,7 @@ function TalentRequestWizard() {
         setIsSubmitting(true);
     };
 
-    const Stepper = () => (
-        <div className="w-full max-w-3xl mx-auto mb-10">
-            <div className="relative flex justify-between items-center">
-                <div className="absolute top-1/2 left-0 w-full h-1 bg-secondary -z-10 rounded-full">
-                    <motion.div
-                        className="h-full bg-primary rounded-full"
-                        initial={{ width: "0%" }}
-                        animate={{ width: `${(step - 1) * 50}%` }}
-                        transition={{ duration: 0.5, ease: "easeInOut" }}
-                    />
-                </div>
 
-                {[1, 2, 3].map((s) => (
-                    <div key={s} className="flex flex-col items-center gap-2 bg-background px-2">
-                        <motion.div
-                            className={cn(
-                                "w-10 h-10 rounded-full flex items-center justify-center border-2 text-sm font-bold transition-colors",
-                                s <= step ? "bg-primary border-primary text-primary-foreground" : "bg-background border-muted-foreground/30 text-muted-foreground"
-                            )}
-                            animate={{ scale: s === step ? 1.1 : 1 }}
-                        >
-                            {s < step ? <CheckCircle2 className="w-6 h-6" /> : s}
-                        </motion.div>
-                        <span className={cn(
-                            "text-xs font-jamsil whitespace-nowrap transition-colors",
-                            s <= step ? "text-primary" : "text-muted-foreground"
-                        )}>
-                            {s === 1 && "Start Analysis"}
-                            {s === 2 && "Setup Strategy"}
-                            {s === 3 && "Start Matching"}
-                        </span>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
 
     const renderStep1 = () => (
         <div className="space-y-6">
@@ -417,46 +682,170 @@ function TalentRequestWizard() {
 
                 <div className="space-y-3">
                     {formData.teamMembers.map((member, idx) => (
-                        <div key={member.id} className={cn("flex gap-3 items-start animate-in fade-in slide-in-from-top-2 duration-300 p-3 rounded-lg border", member.isLeader ? "bg-primary/5 border-primary/30" : "bg-card border-border/50")}>
-                            <div className="pt-3">
-                                <button
-                                    type="button"
-                                    onClick={() => updateMember(member.id, 'isLeader', true)}
-                                    title="리더 지정"
-                                    className={cn("p-1 rounded-full transition-colors", member.isLeader ? "text-yellow-500 bg-yellow-500/10" : "text-muted-foreground/30 hover:text-yellow-500/50")}
-                                >
-                                    <Crown className="w-5 h-5 fill-current" />
-                                </button>
+                        <div key={member.id} className={cn("flex flex-col gap-3 animate-in fade-in slide-in-from-top-2 duration-300 p-3 rounded-lg border transition-colors", member.isLeader ? "bg-primary/5 border-primary/30" : "bg-card border-border/50")}>
+                            <div className="flex gap-3 items-start w-full border-b border-border/40 pb-3 mb-2">
+                                <div className="pt-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => updateMember(member.id, 'isLeader', true)}
+                                        title="리더 지정"
+                                        className={cn("p-1 rounded-full transition-colors", member.isLeader ? "text-yellow-500 bg-yellow-500/10" : "text-muted-foreground/30 hover:text-yellow-500/50")}
+                                    >
+                                        <Crown className="w-5 h-5 fill-current" />
+                                    </button>
+                                </div>
+                                <div className="flex-1 space-y-1">
+                                    <Label className="text-xs text-muted-foreground font-taebaek">이름/직책 {member.isLeader && <Badge variant="secondary" className="text-[10px] ml-1 h-4 px-1">LEADER</Badge>}</Label>
+                                    <Input
+                                        placeholder={member.isLeader ? "예: 홍길동 (CEO)" : "예: 팀원 A"}
+                                        value={member.name}
+                                        onChange={(e) => updateMember(member.id, "name", e.target.value)}
+                                        className={cn("bg-background/50 font-taebaek", errors[`teamMembers.${idx}.name`] && "border-red-500")}
+                                    />
+                                    {errors[`teamMembers.${idx}.name`] && <p className="text-[10px] text-red-500 mt-1">{errors[`teamMembers.${idx}.name`]}</p>}
+                                </div>
+                                <div className="w-[120px] space-y-1">
+                                    <Label className="text-xs text-muted-foreground font-taebaek">MBTI</Label>
+                                    <select
+                                        value={member.mbti}
+                                        onChange={(e) => updateMember(member.id, "mbti", e.target.value as MBTI)}
+                                        className={cn(
+                                            "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background/50 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-taebaek",
+                                            errors[`teamMembers.${idx}.mbti`] && "border-red-500"
+                                        )}
+                                    >
+                                        <option value="" disabled>선택</option>
+                                        {MBTI_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                    </select>
+                                </div>
+                                {formData.teamMembers.length > 1 && (
+                                    <Button variant="ghost" size="icon" className="mt-6 text-muted-foreground hover:text-red-500" onClick={() => handleRemoveMember(member.id)}>
+                                        <X className="w-4 h-4" />
+                                    </Button>
+                                )}
                             </div>
-                            <div className="flex-1 space-y-1">
-                                <Label className="text-xs text-muted-foreground font-taebaek">이름/직책 {member.isLeader && <Badge variant="secondary" className="text-[10px] ml-1 h-4 px-1">LEADER</Badge>}</Label>
-                                <Input
-                                    placeholder={member.isLeader ? "예: 홍길동 (CEO)" : "예: 팀원 A"}
-                                    value={member.name}
-                                    onChange={(e) => updateMember(member.id, "name", e.target.value)}
-                                    className={cn("bg-background/50 font-taebaek", errors[`teamMembers.${idx}.name`] && "border-red-500")}
-                                />
-                                {errors[`teamMembers.${idx}.name`] && <p className="text-[10px] text-red-500 mt-1">{errors[`teamMembers.${idx}.name`]}</p>}
+
+                            {/* Enhanced Profile Inputs */}
+                            <div className="grid md:grid-cols-2 gap-4 px-1 pb-2">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs text-muted-foreground font-taebaek">소통/협업 스타일</Label>
+                                    <div className="flex gap-2">
+                                        <select
+                                            value={member.commStyle}
+                                            onChange={(e) => updateMember(member.id, "commStyle", e.target.value)}
+                                            className="flex h-9 w-full rounded-md border border-input bg-background/50 px-2 text-xs font-taebaek"
+                                        >
+                                            <option value="">소통 방식</option>
+                                            {COMM_STYLES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                        </select>
+                                        <select
+                                            value={member.collabStyle}
+                                            onChange={(e) => updateMember(member.id, "collabStyle", e.target.value)}
+                                            className="flex h-9 w-full rounded-md border border-input bg-background/50 px-2 text-xs font-taebaek"
+                                        >
+                                            <option value="">협업 방식</option>
+                                            {COLLAB_STYLES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs text-muted-foreground font-taebaek">핵심 강점 (다중 선택)</Label>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {STRENGTH_OPTIONS.map(opt => (
+                                            <Badge
+                                                key={opt}
+                                                variant={member.strengths?.includes(opt) ? "default" : "outline"}
+                                                className="cursor-pointer text-[10px] px-2 py-0.5 h-6 font-taebaek hover:bg-primary/20"
+                                                onClick={() => {
+                                                    const current = member.strengths || [];
+                                                    const newValue = current.includes(opt)
+                                                        ? current.filter(s => s !== opt)
+                                                        : [...current, opt];
+                                                    updateMember(member.id, "strengths", newValue);
+                                                }}
+                                            >
+                                                {opt}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
-                            <div className="w-[120px] space-y-1">
-                                <Label className="text-xs text-muted-foreground font-taebaek">MBTI</Label>
-                                <select
-                                    value={member.mbti}
-                                    onChange={(e) => updateMember(member.id, "mbti", e.target.value as MBTI)}
-                                    className={cn(
-                                        "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background/50 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-taebaek",
-                                        errors[`teamMembers.${idx}.mbti`] && "border-red-500"
+
+                            <div className="w-full pt-4 border-t border-border/30 mt-4">
+                                <Label className="text-sm font-bold font-jamsil mb-3 block flex justify-between items-center">
+                                    <span>상세 역량 진단 (Professional Assessment)</span>
+                                    {member.assessmentAnswers ? (
+                                        <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">진단 완료</Badge>
+                                    ) : (
+                                        <Badge variant="outline" className="bg-secondary text-muted-foreground border-border">미진단</Badge>
                                     )}
-                                >
-                                    <option value="" disabled>선택</option>
-                                    {MBTI_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                </select>
+                                </Label>
+
+                                {member.assessmentAnswers ? (
+                                    <div className="space-y-3">
+                                        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                                <span className="text-sm font-bold font-jamsil text-primary">진단 완료: 핵심 성향 분석</span>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                {/* Top 2 Traits */}
+                                                <div className="flex gap-2">
+                                                    {Object.entries(member.evaluation || {})
+                                                        .sort(([, a], [, b]) => (b as number) - (a as number))
+                                                        .slice(0, 2)
+                                                        .map(([key, score]) => {
+                                                            const metric = EVALUATION_METRICS.find(m => m.key === key);
+                                                            // Always show top 2 traits regardless of score to ensure visibility
+                                                            // if ((score as number) < 3.0) return null;
+
+                                                            return (
+                                                                <Badge key={key} variant="outline" className="bg-background border-primary/30 text-primary px-2 py-1 font-taebaek">
+                                                                    {metric?.label} 우수 ({(score as number).toFixed(1)})
+                                                                </Badge>
+                                                            );
+                                                        })}
+                                                </div>
+                                                <p className="text-xs text-muted-foreground font-taebaek leading-relaxed break-keep">
+                                                    {member.evaluation ? generateMemberAnalysis(member.name, member.evaluation as any, member.role) : "진단 결과가 생성됩니다."}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-2">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="flex-1 text-xs text-muted-foreground hover:text-primary font-taebaek h-8"
+                                                onClick={() => setActiveAssessmentMemberId(member.id)}
+                                            >
+                                                <ListChecks className="w-3 h-3 mr-2" /> 다시 진단하기
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="bg-secondary/10 border border-dashed border-primary/20 rounded-lg p-6 flex flex-col items-center justify-center gap-3 text-center transition-colors hover:bg-secondary/20 hover:border-primary/40">
+                                        <div className="p-3 bg-primary/10 rounded-full text-primary mb-1">
+                                            <Database className="w-6 h-6" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="font-jamsil text-sm text-foreground">역량 진단이 필요합니다</h4>
+                                            <p className="font-taebaek text-[11px] text-muted-foreground break-keep px-4">
+                                                심리적 안정감, 실행력, 그릿 등 6가지 핵심 역량을 전문 진단 도구로 분석합니다. (약 1분 소요)
+                                            </p>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            onClick={() => setActiveAssessmentMemberId(member.id)}
+                                            className="mt-2 font-taebaek text-xs shadow-md"
+                                        >
+                                            역량 진단 시작하기 <ArrowRight className="w-3 h-3 ml-1" />
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
-                            {formData.teamMembers.length > 1 && (
-                                <Button variant="ghost" size="icon" className="mt-6 text-muted-foreground hover:text-red-500" onClick={() => handleRemoveMember(member.id)}>
-                                    <X className="w-4 h-4" />
-                                </Button>
-                            )}
                         </div>
                     ))}
                 </div>
@@ -477,122 +866,197 @@ function TalentRequestWizard() {
     );
 
     const renderStep2 = () => (
-        <div className="space-y-6">
-            <div className="space-y-2 text-center md:text-left">
-                <h2 className="text-2xl font-jamsil text-primary">2. 팀핏 진단 & 전략 수립</h2>
-                <p className="text-muted-foreground font-taebaek">팀의 강점을 기반으로 부족한 부분을 진단하고 채용 전략을 결정합니다.</p>
+        <div className="space-y-8">
+            <div className="space-y-2 text-center md:text-left border-b border-border/40 pb-4">
+                <div className="flex items-center gap-2 mb-1">
+                    <Badge variant="outline" className="border-primary/30 text-primary uppercase text-[10px] tracking-widest">Premium Report</Badge>
+                </div>
+                <h2 className="text-3xl font-jamsil text-primary">2. Vana Growth Readiness Report</h2>
+                <p className="text-muted-foreground font-taebaek">귀사의 성장 준비도를 3가지 핵심 지표(안정성, 실행력, 혁신성)로 진단한 결과입니다.</p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-                <div className="bg-slate-50 dark:bg-slate-900/50 border border-border p-4 rounded-xl space-y-4">
-                    <div className="flex items-center gap-2 border-b pb-2 border-border/50">
-                        <Users className="w-4 h-4 text-blue-500" />
-                        <h3 className="font-bold text-sm font-jamsil text-foreground/80">Team DNA</h3>
+            {/* Top Row: Growth Score & Key Metrics */}
+            <div className="grid md:grid-cols-3 gap-6">
+                {/* Growth Gauge */}
+                <div className="md:col-span-1 bg-gradient-to-br from-background to-secondary/20 border p-6 rounded-2xl flex items-center justify-center shadow-sm">
+                    {analysis && <GrowthScoreGauge score={analysis.growthScore} />}
+                </div>
+
+                {/* 3 Key Metrics */}
+                <div className="md:col-span-2 grid grid-cols-1 gap-4">
+                    <div className="bg-card border p-4 rounded-xl flex items-center gap-4 shadow-sm">
+                        <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-lg text-blue-600">
+                            <ShieldCheck className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1 space-y-2">
+                            <div className="flex justify-between items-end">
+                                <Label className="text-base font-bold font-jamsil">Stability Score (안정성)</Label>
+                                <span className="text-xl font-bold text-blue-600">{analysis?.readinessMetrics.stability}</span>
+                            </div>
+                            <Progress value={analysis?.readinessMetrics.stability} className="h-2" />
+                            <p className="text-xs text-muted-foreground font-taebaek">심리적 안전감과 신뢰도 수준을 나타냅니다.</p>
+                        </div>
                     </div>
-                    <div>
-                        <p className="font-bold text-lg text-primary mb-1 font-jamsil">{analysis?.dnaDesc}</p>
-                        <p className="text-xs text-muted-foreground font-taebaek">리더 성향 50% 가중 반영됨</p>
+                    <div className="bg-card border p-4 rounded-xl flex items-center gap-4 shadow-sm">
+                        <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-lg text-green-600">
+                            <Zap className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1 space-y-2">
+                            <div className="flex justify-between items-end">
+                                <Label className="text-base font-bold font-jamsil">Velocity Score (실행력)</Label>
+                                <span className="text-xl font-bold text-green-600">{analysis?.readinessMetrics.velocity}</span>
+                            </div>
+                            <Progress value={analysis?.readinessMetrics.velocity} className="h-2" />
+                            <p className="text-xs text-muted-foreground font-taebaek">의사결정 속도와 목표 달성 역량을 나타냅니다.</p>
+                        </div>
+                    </div>
+                    <div className="bg-card border p-4 rounded-xl flex items-center gap-4 shadow-sm">
+                        <div className="p-3 bg-purple-100 dark:bg-purple-900/20 rounded-lg text-purple-600">
+                            <Lightbulb className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1 space-y-2">
+                            <div className="flex justify-between items-end">
+                                <Label className="text-base font-bold font-jamsil">Innovation Index (혁신성)</Label>
+                                <span className="text-xl font-bold text-purple-600">{analysis?.readinessMetrics.innovation}</span>
+                            </div>
+                            <Progress value={analysis?.readinessMetrics.innovation} className="h-2" />
+                            <p className="text-xs text-muted-foreground font-taebaek">다양성과 창의적 문제해결 능력을 나타냅니다.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Middle Row: DNA & Heatmap */}
+            <div className="grid md:grid-cols-2 gap-6">
+                <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl flex flex-col h-full space-y-6">
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 border-b border-slate-300/50 pb-3">
+                            <Users className="w-5 h-5 text-slate-700" />
+                            <h3 className="font-bold text-lg font-jamsil text-slate-800">Team Composition Analysis</h3>
+                        </div>
+                        <div>
+                            <p className="font-bold text-xl text-primary mb-3 font-jamsil leading-tight">{analysis?.dnaDesc}</p>
+                            <p className="text-sm text-muted-foreground font-taebaek leading-relaxed">
+                                현재 팀은 {analysis?.commStyle} 소통 방식과 {analysis?.collabStyle} 협업 스타일이 지배적입니다.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="pt-2">
+                        <Label className="text-xs text-muted-foreground font-jamsil mb-3 block">Role Balance (Hustler-Hacker-Hipster)</Label>
+                        {analysis && <RoleBalanceHeatmap roles={analysis.roleBalance} />}
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-300/50">
+                        <Label className="text-xs text-muted-foreground font-jamsil mb-2 block">Top Synergies & Strengths</Label>
+                        <div className="flex flex-wrap gap-2">
+                            {analysis?.topStrengths?.map(s => (
+                                <Badge key={s} variant="outline" className="bg-white border-slate-300 text-slate-700">{s}</Badge>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
-                <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 p-4 rounded-xl space-y-4">
-                    <div className="flex items-center gap-2 border-b pb-2 border-red-200/50">
-                        <AlertTriangle className="w-4 h-4 text-red-500" />
-                        <h3 className="font-bold text-sm font-jamsil text-red-700 dark:text-red-400">팀핏 진단 (Blind Spots)</h3>
+                <div className="bg-white dark:bg-card border p-6 rounded-2xl flex flex-col h-full">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="font-bold text-lg font-jamsil text-slate-800">Detailed Capability Radar</h3>
+                        <Badge variant="secondary">Hexagon Model</Badge>
                     </div>
-                    <div>
-                        <p className="text-sm font-medium text-red-800 dark:text-red-300 leading-relaxed font-taebaek">
-                            "{analysis?.deficiencyDesc}"
-                        </p>
+                    <div className="flex-1 flex justify-center items-center">
+                        {analysis?.radarData && <RadarChart data={analysis.radarData} width={280} height={280} />}
                     </div>
                 </div>
             </div>
 
-            <div className="space-y-3 pt-2">
-                <Label className="text-base font-jamsil">채용 알고리즘 전략 선택</Label>
-                <div className="grid grid-cols-2 gap-4">
+            {/* Bottom Row: Roadmap & Recommendation */}
+            <div className="space-y-6">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border border-blue-100 dark:border-blue-900 p-6 rounded-2xl">
+                    <div className="flex items-center gap-3 mb-4">
+                        <MapIcon className="w-6 h-6 text-blue-600" />
+                        <h3 className="font-bold text-xl font-jamsil text-blue-900 dark:text-blue-100">Actionable Growth Roadmap</h3>
+                    </div>
+                    <ul className="space-y-3">
+                        {analysis?.roadmap.map((step, i) => (
+                            <li key={i} className="flex gap-3 bg-white/60 dark:bg-black/20 p-3 rounded-lg border border-blue-200/50">
+                                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">{i + 1}</span>
+                                <p className="text-sm font-taebaek text-foreground/90 leading-relaxed">{step}</p>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
                     <div
                         onClick={() => setFormData(p => ({ ...p, strategy: 'clone' }))}
                         className={cn(
-                            "cursor-pointer p-4 rounded-xl border-2 transition-all flex flex-col gap-2",
-                            formData.strategy === 'clone' ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                            "cursor-pointer p-5 rounded-2xl border-2 transition-all hover:shadow-md",
+                            formData.strategy === 'clone' ? "border-primary bg-primary/5" : "border-border/60 hover:border-primary/50"
                         )}
                     >
-                        <div className="flex items-center justify-between">
-                            <span className="font-bold flex items-center gap-2 font-jamsil"><ShieldCheck className="w-4 h-4" /> 안정성 (Clone)</span>
-                            {formData.strategy === 'clone' && <CheckCircle2 className="w-4 h-4 text-primary" />}
+                        <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-bold font-jamsil flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Stability Strategy (Clone)</h4>
+                            {formData.strategy === 'clone' && <CheckCircle2 className="w-5 h-5 text-primary" />}
                         </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed font-taebaek">
-                            리더 및 핵심 인재와 유사한 성향을 추천합니다.<br />
-                            <span className="text-primary font-medium">효과: 빠른 적응, 소통 비용 최소화</span>
+                        <p className="text-xs text-muted-foreground font-taebaek leading-relaxed pl-6">
+                            현재의 조직 문화를 강화하고 빠른 적응을 최우선으로 합니다. <br />
+                            <span className="text-primary font-bold">Best for: 초기 MVP 개발, 단기 목표 달성 집중 시기</span>
                         </p>
                     </div>
 
                     <div
                         onClick={() => setFormData(p => ({ ...p, strategy: 'complement' }))}
                         className={cn(
-                            "cursor-pointer p-4 rounded-xl border-2 transition-all flex flex-col gap-2",
-                            formData.strategy === 'complement' ? "border-purple-500 bg-purple-500/5" : "border-border hover:border-purple-500/50"
+                            "cursor-pointer p-5 rounded-2xl border-2 transition-all hover:shadow-md",
+                            formData.strategy === 'complement' ? "border-purple-500 bg-purple-500/5" : "border-border/60 hover:border-purple-500/50"
                         )}
                     >
-                        <div className="flex items-center justify-between">
-                            <span className="font-bold flex items-center gap-2 font-jamsil"><Zap className="w-4 h-4" /> 혁신 (Complement)</span>
-                            {formData.strategy === 'complement' && <CheckCircle2 className="w-4 h-4 text-purple-500" />}
+                        <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-bold font-jamsil flex items-center gap-2"><Zap className="w-4 h-4" /> Innovation Strategy (Complement)</h4>
+                            {formData.strategy === 'complement' && <CheckCircle2 className="w-5 h-5 text-purple-500" />}
                         </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed font-taebaek">
-                            팀의 결핍을 보완하는 반대 성향을 추천합니다.<br />
-                            <span className="text-purple-500 font-medium">효과: 집단 사고 방지, 균형 확보</span>
+                        <p className="text-xs text-muted-foreground font-taebaek leading-relaxed pl-6">
+                            현재 부족한 역량을 보완하고 혁신을 도모합니다. <br />
+                            <span className="text-purple-600 font-bold">Best for: 스케일업 단계, 새로운 시장 진입 시기</span>
                         </p>
                     </div>
                 </div>
-            </div>
 
-            <div className="p-4 bg-gradient-to-r from-background to-secondary/30 border rounded-xl flex items-center justify-between">
-                <div>
-                    <Label className="text-xs text-muted-foreground font-taebaek">추천 프로필 (Recommended)</Label>
-                    <div className="text-xl font-bold flex items-center gap-2 font-jamsil">
-                        {analysis?.persona}
+                {/* Manual Inputs for Recruit Info */}
+                <div className="bg-card border p-6 rounded-2xl space-y-6">
+                    <h3 className="font-bold text-lg font-jamsil border-b pb-2">Target Role Specification</h3>
+                    <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <Label htmlFor="role" className="font-jamsil">채용 직군 <span className="text-red-500">*</span></Label>
+                            <Input id="role"
+                                placeholder="예: 그로스 마케터"
+                                value={formData.role}
+                                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                className={cn("font-taebaek h-11", errors.role && "border-red-500")}
+                            />
+                            {errors.role && <p className="text-xs text-red-500">{errors.role}</p>}
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="experience" className="font-jamsil">경력 요건</Label>
+                            <Input
+                                id="experience"
+                                placeholder="예: 3~5년차"
+                                value={formData.experience}
+                                onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                                className={cn("font-taebaek h-11", errors.experience && "border-red-500")}
+                            />
+                        </div>
+                        <div className="md:col-span-2 space-y-2">
+                            <Label htmlFor="duties" className="font-jamsil">주요 업무 (Key Responsibilities)</Label>
+                            <Textarea
+                                id="duties"
+                                placeholder="예: 사용자 데이터 분석 및 실험 설계"
+                                className="min-h-[80px] font-taebaek resize-none"
+                                value={formData.duties}
+                                onChange={(e) => setFormData({ ...formData, duties: e.target.value })}
+                            />
+                        </div>
                     </div>
                 </div>
-                <div className="text-right">
-                    <Label className="text-xs text-muted-foreground font-taebaek">매칭 점수</Label>
-                    <div className="text-xl font-bold text-primary font-jamsil">{analysis?.score}점</div>
-                </div>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-4 pt-2">
-                <div className="space-y-2">
-                    <Label htmlFor="role" className="font-jamsil">채용 직군 <span className="text-red-500">*</span></Label>
-                    <Input id="role"
-                        placeholder="예: 그로스 마케터"
-                        value={formData.role}
-                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                        className={cn("font-taebaek", errors.role && "border-red-500")}
-                    />
-                    {errors.role && <p className="text-xs text-red-500">{errors.role}</p>}
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="experience" className="font-jamsil">경력 요건</Label>
-                    <Input
-                        id="experience"
-                        placeholder="예: 3~5년차"
-                        value={formData.experience}
-                        onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
-                        className={cn("font-taebaek", errors.experience && "border-red-500")}
-                    />
-                    {errors.experience && <p className="text-xs text-red-500">{errors.experience}</p>}
-                </div>
-            </div>
-
-            <div className="space-y-2">
-                <Label htmlFor="duties" className="font-jamsil">주요 업무 (Key Responsibilities)</Label>
-                <Textarea
-                    id="duties"
-                    placeholder="예: 사용자 데이터 분석 및 실험 설계"
-                    className="min-h-[80px] font-taebaek"
-                    value={formData.duties}
-                    onChange={(e) => setFormData({ ...formData, duties: e.target.value })}
-                />
             </div>
         </div>
     );
@@ -730,7 +1194,7 @@ function TalentRequestWizard() {
                         <h1 className="text-3xl font-bold tracking-tight font-jamsil">AI 인재 매칭 프로세스</h1>
                     </div>
 
-                    <Stepper />
+                    <Stepper step={step} />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
@@ -798,6 +1262,15 @@ function TalentRequestWizard() {
                     </Card>
                 </div>
             </motion.div>
+
+            <AssessmentModal
+                isOpen={!!activeAssessmentMemberId}
+                onClose={() => setActiveAssessmentMemberId(null)}
+                onComplete={handleAssessmentComplete}
+                memberName={formData.teamMembers.find(m => m.id === activeAssessmentMemberId)?.name || "팀원"}
+                memberId={activeAssessmentMemberId || ""}
+                initialAnswers={formData.teamMembers.find(m => m.id === activeAssessmentMemberId)?.assessmentAnswers}
+            />
         </div>
     );
 }

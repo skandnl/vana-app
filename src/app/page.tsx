@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight, Sprout, Leaf, TreeDeciduous, TreePalm, CheckCircle2, ChevronRight, X, Coins, Bean, Calendar } from "lucide-react";
+import { ArrowRight, Sprout, Leaf, TreeDeciduous, TreePalm, CheckCircle2, ChevronRight, X, Coins, Bean, Calendar, BookOpen } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -119,7 +119,12 @@ export default function LandingPage() {
             </Button>
           </Link>
 
-          <span className="text-lg text-muted-foreground font-medium bg-white/50 px-4 py-2 rounded-full backdrop-blur-sm">
+          <Link href="/guides/team-building" className="text-sm text-muted-foreground hover:text-green-700 hover:underline transition-all flex items-center gap-1">
+            <BookOpen className="w-4 h-4" />
+            초기 스타트업 팀 빌딩 가이드 읽어보기
+          </Link>
+
+          <span className="text-lg text-muted-foreground font-medium bg-white/50 px-4 py-2 rounded-full backdrop-blur-sm mt-4">
             지금 어떤 성장 단계에 있으신가요?
           </span>
         </div>
