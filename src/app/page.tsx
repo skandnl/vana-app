@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight, Sprout, Leaf, TreeDeciduous, TreePalm, CheckCircle2, ChevronRight, X, Coins, Bean } from "lucide-react";
+import { ArrowRight, Sprout, Leaf, TreeDeciduous, TreePalm, CheckCircle2, ChevronRight, X, Coins, Bean, Calendar } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -111,7 +111,14 @@ export default function LandingPage() {
           <span className="tracking-wide text-foreground/80">Seed부터 Unicorn까지, 팀 성장의 모든 것</span>
         </motion.div>
 
-        <div className="pt-8 pb-4">
+        <div className="pt-8 pb-4 flex flex-col items-center gap-4">
+          <Link href="/consulting/book">
+            <Button className="bg-white/80 backdrop-blur-sm border-2 border-green-200 text-green-800 hover:bg-green-50 hover:text-green-900 hover:border-green-300 shadow-sm text-lg px-6 py-6 rounded-full font-bold transition-all group">
+              <Calendar className="w-5 h-5 mr-2 text-green-600 group-hover:scale-110 transition-transform" />
+              HR 해결사 송근영님에게 상담 신청하기
+            </Button>
+          </Link>
+
           <span className="text-lg text-muted-foreground font-medium bg-white/50 px-4 py-2 rounded-full backdrop-blur-sm">
             지금 어떤 성장 단계에 있으신가요?
           </span>
@@ -137,7 +144,6 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* Stage Selector */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-6xl z-10 px-4">
         {STAGES.map((stage, index) => {
           // @ts-ignore

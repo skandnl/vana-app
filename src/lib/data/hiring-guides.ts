@@ -6,7 +6,7 @@ export const HIRING_GUIDES = {
         description: "비전을 공유하고 초기 제품을 함께 기획할 핵심 멤버를 찾습니다.",
         typicalRoles: ["Co-founder (Tech)", "Founding Designer", "Business Generalist"],
         challenges: "구체적인 보상보다는 '비전'으로 사람을 설득해야 하는 어려움이 있습니다. 아직 제품이 없기 때문에 신뢰를 주기가 어렵습니다.",
-        solution: "Comes는 창업자의 성향(DNA)을 분석하여, 부족한 역량을 채워줄 수 있는 '상호보완적' 파트너를 찾도록 돕습니다.",
+        solution: "Comes는 창업자의 성향(DNA)을 분석하여, 부족한 역량을 채워줄 수 있는 '상호보완적' 파트너를 찾도록 돕습니다. 또한, 초기 HR 전문가가 직접 투입되어 팀 빌딩 컨설팅을 함께 제공합니다.",
         investmentScale: "1억 원 미만"
     },
     "angel": {
@@ -16,7 +16,7 @@ export const HIRING_GUIDES = {
         description: "고객 인터뷰 및 시장 조사를 주도적으로 수행할 수 있는 인재가 필요합니다.",
         typicalRoles: ["Product Owner", "UX Researcher", "Full-stack Engineer (Prototyping)"],
         challenges: "수많은 가설 중에서 무엇을 먼저 검증할지 판단하기 어렵고, 빠른 실행력이 요구됩니다.",
-        solution: "Comes는 초기 가설 검증 경험이 풍부하고, 불확실성을 즐기는 '주도적 성향'의 인재를 매칭합니다.",
+        solution: "Comes는 초기 가설 검증 경험이 풍부하고, 불확실성을 즐기는 '주도적 성향'의 인재를 매칭합니다. 또한, 초기 HR 전문가가 직접 투입되어 팀 빌딩 컨설팅을 함께 제공합니다.",
         investmentScale: "1억 ~ 5억 원"
     },
     "seed": {

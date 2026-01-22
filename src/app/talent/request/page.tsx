@@ -9,10 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { HIRING_GUIDES } from "@/lib/data/hiring-guides";
+import { TALENT_REQUEST_SCHEMA } from "@/lib/schemas";
+import { z } from "zod";
 
 // --- Types ---
 
@@ -46,8 +47,8 @@ interface RequestState {
 }
 
 interface TeamAnalysisResult {
-    dominantTraits: string[]; // e.g., ["E", "N", "T", "J"]
-    deficiencies: string[]; // e.g., ["S", "F"]
+    dominantTraits: string[];
+    deficiencies: string[];
     dnaDescription: string;
     deficiencyDescription: string;
     recommendedPersona: string;
@@ -66,22 +67,9 @@ const MBTI_OPTIONS: MBTI[] = [
 
 // --- Advanced Analysis Logic ---
 
-const MBTI_SCALES = {
-    EI: { E: 1, I: -1 },
-    SN: { S: 1, N: -1 },
-    TF: { T: 1, F: -1 },
-    JP: { J: 1, P: -1 }
-};
-
 function calculateTeamDNA(members: TeamMember[]): { scores: Record<string, number>, analysis: TeamAnalysisResult, recommendedMBTI: string } {
     let scores = { EI: 0, SN: 0, TF: 0, JP: 0 };
     let leaderFound = false;
-
-    // 1. Calculate Scores (Leader 50% Weight)
-    // If n members, Leader weight = n. (So leader is half the total influence? No, prompt says "Leader determines 50%").
-    // Let's maximize leader impact.
-    // If Leader exists: Leader Score * 1.0, Average Member Score * 1.0 -> Average them?
-    // Let's do: Total Score = (LeaderVec * 1.0) + (AvgMemberVec * 1.0). Leader has equal weight to ALL other members combined.
 
     const leader = members.find(m => m.isLeader);
     const others = members.filter(m => !m.isLeader);
@@ -122,8 +110,6 @@ function calculateTeamDNA(members: TeamMember[]): { scores: Record<string, numbe
         othersVec.JP /= validOthers;
     }
 
-    // Combine: 50% Leader, 50% Team
-    // If no leader, 100% Team. If no team, 100% Leader.
     if (leaderFound && validOthers > 0) {
         scores.EI = (leaderVec.EI + othersVec.EI) / 2;
         scores.SN = (leaderVec.SN + othersVec.SN) / 2;
@@ -135,7 +121,6 @@ function calculateTeamDNA(members: TeamMember[]): { scores: Record<string, numbe
         scores = othersVec;
     }
 
-    // 2. Identify Dominant & Deficient
     const dominantTraits: string[] = [];
     const deficiencies: string[] = [];
 
@@ -144,13 +129,11 @@ function calculateTeamDNA(members: TeamMember[]): { scores: Record<string, numbe
     if (scores.TF > 0.3) dominantTraits.push("T (사고)"); else if (scores.TF < -0.3) dominantTraits.push("F (감정)");
     if (scores.JP > 0.3) dominantTraits.push("J (판단)"); else if (scores.JP < -0.3) dominantTraits.push("P (인식)");
 
-    // Deficiencies (Inverse of strong dominants)
     if (scores.EI > 0.5) deficiencies.push("I (신중함)"); else if (scores.EI < -0.5) deficiencies.push("E (에너지)");
     if (scores.SN > 0.5) deficiencies.push("N (상상력)"); else if (scores.SN < -0.5) deficiencies.push("S (실행력)");
     if (scores.TF > 0.5) deficiencies.push("F (공감)"); else if (scores.TF < -0.5) deficiencies.push("T (논리)");
     if (scores.JP > 0.5) deficiencies.push("P (유연성)"); else if (scores.JP < -0.5) deficiencies.push("J (체계)");
 
-    // 3. Descriptions
     let dnaDesc = "균형 잡힌 팀입니다.";
     if (scores.SN < -0.3 && scores.TF > 0.3) dnaDesc = "전형적인 '혁신가' 조직 (NT): 논리적이고 비전 중심적입니다.";
     else if (scores.SN > 0.3 && scores.JP > 0.3) dnaDesc = "전형적인 '관리자' 조직 (SJ): 체계적이고 안정적입니다.";
@@ -163,8 +146,6 @@ function calculateTeamDNA(members: TeamMember[]): { scores: Record<string, numbe
     else if (deficiencies.includes("J (체계)")) defDesc = "유연하지만, 마감 준수나 체계적인 프로세스(J)가 약할 수 있습니다.";
     else if (deficiencies.includes("N (상상력)")) defDesc = "현실적이지만, 장기적인 비전이나 새로운 시도(N)가 부족할 수 있습니다.";
 
-    // 4. Recommendation Base MBTI String
-    // Construct simplified string like "ENTJ"
     const recStr = [
         scores.EI > 0 ? "E" : "I",
         scores.SN > 0 ? "S" : "N",
@@ -180,7 +161,7 @@ function calculateTeamDNA(members: TeamMember[]): { scores: Record<string, numbe
             deficiencies,
             dnaDescription: dnaDesc,
             deficiencyDescription: defDesc,
-            recommendedPersona: "", // filled later based on strategy
+            recommendedPersona: "",
             simulation: { score: 0, scenario: "" }
         }
     };
@@ -202,7 +183,6 @@ function getRecommendation(baseMBTI: string, strategy: "clone" | "complement"): 
             score: 92
         };
     } else {
-        // Complement: Invert the string logic
         const invert = (char: string) => {
             if (char === 'E') return 'I'; if (char === 'I') return 'E';
             if (char === 'S') return 'N'; if (char === 'N') return 'S';
@@ -262,10 +242,9 @@ function TalentRequestWizard() {
         customQuestions: []
     });
 
-    // Computed Analysis
     const [analysis, setAnalysis] = useState<ReturnType<typeof getRecommendation> & { deficiencyDesc: string, dnaDesc: string } | null>(null);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
-    // Update analysis when members or strategy changes
     useEffect(() => {
         const { recommendedMBTI, analysis: rawAnalysis } = calculateTeamDNA(formData.teamMembers);
         const rec = getRecommendation(recommendedMBTI, formData.strategy);
@@ -277,7 +256,6 @@ function TalentRequestWizard() {
     }, [formData.teamMembers, formData.strategy]);
 
 
-    // Loading Animation
     const loadingMessages = [
         { text: "리더 및 팀 DNA 정밀 분석 중...", icon: Users },
         { text: "팀핏(Team Fit) 진단 및 결핍 요소 확인...", icon: AlertTriangle },
@@ -324,7 +302,6 @@ function TalentRequestWizard() {
             teamMembers: prev.teamMembers.map(m => {
                 if (m.id === id) {
                     if (field === 'isLeader' && value === true) {
-                        // Unset other leaders
                         return { ...m, isLeader: true };
                     }
                     return { ...m, [field]: value };
@@ -337,7 +314,39 @@ function TalentRequestWizard() {
         }));
     };
 
+    const validateStep = (currentStep: number) => {
+        try {
+            if (currentStep === 1) {
+                // Validate Step 1 Partial
+                TALENT_REQUEST_SCHEMA.pick({ teamMembers: true, teamGoal: true }).parse(formData);
+            } else if (currentStep === 2) {
+                // Validate Step 2 Partial
+                TALENT_REQUEST_SCHEMA.pick({ role: true, experience: true }).parse(formData);
+            }
+            setErrors({});
+            return true;
+        } catch (error) {
+            console.error("Validation Error:", error);
+            if (error instanceof z.ZodError) {
+                const newErrors: Record<string, string> = {};
+                // ZodError has .issues typically, checking both for safety
+                const issues = error.issues || (error as any).errors;
+
+                if (Array.isArray(issues)) {
+                    issues.forEach((err: any) => {
+                        const path = err.path.join(".");
+                        newErrors[path] = err.message;
+                    });
+                }
+                setErrors(newErrors);
+            }
+            return false;
+        }
+    };
+
     const nextStep = () => {
+        if (!validateStep(step)) return;
+
         if (step === 2 && formData.customQuestions.length === 0) {
             setFormData(prev => ({
                 ...prev,
@@ -350,15 +359,13 @@ function TalentRequestWizard() {
     const prevStep = () => setStep(prev => prev - 1);
 
     const handleSubmit = () => {
+        if (!validateStep(step)) return;
         setIsSubmitting(true);
     };
-
-    // --- Components ---
 
     const Stepper = () => (
         <div className="w-full max-w-3xl mx-auto mb-10">
             <div className="relative flex justify-between items-center">
-                {/* Connecting Line */}
                 <div className="absolute top-1/2 left-0 w-full h-1 bg-secondary -z-10 rounded-full">
                     <motion.div
                         className="h-full bg-primary rounded-full"
@@ -392,8 +399,6 @@ function TalentRequestWizard() {
             </div>
         </div>
     );
-
-    // --- Steps Rendering ---
 
     const renderStep1 = () => (
         <div className="space-y-6">
@@ -429,15 +434,19 @@ function TalentRequestWizard() {
                                     placeholder={member.isLeader ? "예: 홍길동 (CEO)" : "예: 팀원 A"}
                                     value={member.name}
                                     onChange={(e) => updateMember(member.id, "name", e.target.value)}
-                                    className="bg-background/50 font-taebaek"
+                                    className={cn("bg-background/50 font-taebaek", errors[`teamMembers.${idx}.name`] && "border-red-500")}
                                 />
+                                {errors[`teamMembers.${idx}.name`] && <p className="text-[10px] text-red-500 mt-1">{errors[`teamMembers.${idx}.name`]}</p>}
                             </div>
                             <div className="w-[120px] space-y-1">
                                 <Label className="text-xs text-muted-foreground font-taebaek">MBTI</Label>
                                 <select
                                     value={member.mbti}
                                     onChange={(e) => updateMember(member.id, "mbti", e.target.value as MBTI)}
-                                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background/50 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-taebaek"
+                                    className={cn(
+                                        "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background/50 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-taebaek",
+                                        errors[`teamMembers.${idx}.mbti`] && "border-red-500"
+                                    )}
                                 >
                                     <option value="" disabled>선택</option>
                                     {MBTI_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -460,8 +469,9 @@ function TalentRequestWizard() {
                     placeholder="예: 3개월 내 MVP 출시, 또는 안정적인 운영 시스템 구축"
                     value={formData.teamGoal}
                     onChange={(e) => setFormData(prev => ({ ...prev, teamGoal: e.target.value }))}
-                    className="min-h-[100px] bg-background/50 font-taebaek"
+                    className={cn("min-h-[100px] bg-background/50 font-taebaek", errors.teamGoal && "border-red-500")}
                 />
+                {errors.teamGoal && <p className="text-xs text-red-500 mt-1">{errors.teamGoal}</p>}
             </div>
         </div>
     );
@@ -469,12 +479,11 @@ function TalentRequestWizard() {
     const renderStep2 = () => (
         <div className="space-y-6">
             <div className="space-y-2 text-center md:text-left">
-                <h2 className="text-2xl font-jamsil text-primary">2. 팀핏 진단 & 전략 수립</h2> {/* Renamed Terminology */}
+                <h2 className="text-2xl font-jamsil text-primary">2. 팀핏 진단 & 전략 수립</h2>
                 <p className="text-muted-foreground font-taebaek">팀의 강점을 기반으로 부족한 부분을 진단하고 채용 전략을 결정합니다.</p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">
-                {/* Analysis Card */}
                 <div className="bg-slate-50 dark:bg-slate-900/50 border border-border p-4 rounded-xl space-y-4">
                     <div className="flex items-center gap-2 border-b pb-2 border-border/50">
                         <Users className="w-4 h-4 text-blue-500" />
@@ -486,11 +495,10 @@ function TalentRequestWizard() {
                     </div>
                 </div>
 
-                {/* Deficiency Card */}
                 <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 p-4 rounded-xl space-y-4">
                     <div className="flex items-center gap-2 border-b pb-2 border-red-200/50">
                         <AlertTriangle className="w-4 h-4 text-red-500" />
-                        <h3 className="font-bold text-sm font-jamsil text-red-700 dark:text-red-400">팀핏 진단 (Blind Spots)</h3> {/* Renamed Terminology */}
+                        <h3 className="font-bold text-sm font-jamsil text-red-700 dark:text-red-400">팀핏 진단 (Blind Spots)</h3>
                     </div>
                     <div>
                         <p className="text-sm font-medium text-red-800 dark:text-red-300 leading-relaxed font-taebaek">
@@ -555,11 +563,24 @@ function TalentRequestWizard() {
             <div className="grid md:grid-cols-2 gap-4 pt-2">
                 <div className="space-y-2">
                     <Label htmlFor="role" className="font-jamsil">채용 직군 <span className="text-red-500">*</span></Label>
-                    <Input id="role" placeholder="예: 그로스 마케터" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })} className="font-taebaek" />
+                    <Input id="role"
+                        placeholder="예: 그로스 마케터"
+                        value={formData.role}
+                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                        className={cn("font-taebaek", errors.role && "border-red-500")}
+                    />
+                    {errors.role && <p className="text-xs text-red-500">{errors.role}</p>}
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="experience" className="font-jamsil">경력 요건</Label>
-                    <Input id="experience" placeholder="예: 3~5년차" value={formData.experience} onChange={(e) => setFormData({ ...formData, experience: e.target.value })} className="font-taebaek" />
+                    <Input
+                        id="experience"
+                        placeholder="예: 3~5년차"
+                        value={formData.experience}
+                        onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                        className={cn("font-taebaek", errors.experience && "border-red-500")}
+                    />
+                    {errors.experience && <p className="text-xs text-red-500">{errors.experience}</p>}
                 </div>
             </div>
 
@@ -649,8 +670,6 @@ function TalentRequestWizard() {
         </div>
     );
 
-    // --- Main Render ---
-
     if (isSubmitting) {
         return (
             <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-6 relative overflow-hidden font-taebaek">
@@ -705,19 +724,16 @@ function TalentRequestWizard() {
                 animate={{ opacity: 1, y: 0 }}
                 className="w-full max-w-4xl z-10"
             >
-                {/* Header Container */}
                 <div className="mb-8 flex flex-col items-center text-center space-y-6">
                     <div className="space-y-2">
                         <Badge variant="secondary" className="mb-2 font-jamsil">{guide.title}</Badge>
                         <h1 className="text-3xl font-bold tracking-tight font-jamsil">AI 인재 매칭 프로세스</h1>
                     </div>
 
-                    {/* Visual Stepper */}
                     <Stepper />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-                    {/* Left Sidebar Guide (Collapsed on mobile, expanded on desktop) */}
                     <div className="hidden md:block md:col-span-4 lg:col-span-3 space-y-4">
                         <Card className="border-primary/20 bg-primary/5 sticky top-6">
                             <CardHeader className="pb-3 border-b border-primary/10">
@@ -739,7 +755,6 @@ function TalentRequestWizard() {
                         </Card>
                     </div>
 
-                    {/* Main Form Area */}
                     <Card className="md:col-span-8 lg:col-span-9 border-border/50 bg-card/50 backdrop-blur-sm shadow-xl">
                         <CardContent className="p-6 md:p-8">
                             <AnimatePresence mode="wait">
@@ -756,7 +771,6 @@ function TalentRequestWizard() {
                                 </motion.div>
                             </AnimatePresence>
 
-                            {/* Navigation Buttons */}
                             <div className="flex justify-between items-center mt-8 pt-6 border-t border-border/40">
                                 <Button
                                     variant="ghost"
